@@ -7,7 +7,7 @@
 
 ## Compte rendu du déroulé du Projet
 
-Notre application Android est composée d'une simple Activity contenant un Webview. La librairy OpenLayers étant principalement en JavaScript, la partie Android est très simple. La seule subtilité étant la déclaration des permissions nécessaire dans le manifeste (cf. [AndroidManifest.xml](./src/main/AndroidManifest.xml)), ainsi que l'activation de la géolocalisation.
+Notre application Android est composée d'une simple Activity contenant un Webview. La librairy OpenLayers étant principalement en JavaScript, la partie Android est très simple. La seule subtilité étant la déclaration des permissions nécessaire dans le manifeste (cf. AndroidManifest.xml), ainsi que l'activation de la géolocalisation.
 
 Pour ce qui est de OpenLayers, tout est contenu dans un simple fichier HTML, définissant une carte OpenLayers ainsi que quelques commandes. La carte OpenLayers est une carte OSM centrée sur les coordonnées d'Orléans. De plus, grâce à une permission dans le manifeste, nous obtenons et affichons également la géolocalisation de l'appareil.
 

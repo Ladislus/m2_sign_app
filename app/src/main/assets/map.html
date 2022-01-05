@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.9.0/css/ol.css" type="text/css">
+    <style>
+            .map {
+                height: 25em;
+                width: 100%;
+            }
+            .dot {
+                height: 10px;
+                width: 10px;
+                background-color: #bbb;
+                border-radius: 50%;
+                display: inline-block;
+            }
+        </style>
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.9.0/build/ol.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <title>OpenLayers example</title>
+</head>
+<body>
+<div id="map" class="map"></div>
+<div>
+    <input type="checkbox" id="velo" name="velo" checked>
+    <label for="velo">Vélo</label>
+    <input type="checkbox" id="tramBus" name="tramBus" checked>
+    <label for="tramBus">Tram/Bus</label>
+</div>
+<form id="filter" action="">
+    <div>
+        <label>Filtre sur les lignes et arrets de bus/trams</label><br>
+        <input id="input_filter" type="text">
+    </div>
+    <div>
+        <input id="filter_btn" type="button" value="Filter">
+    </div>
+</form>
+<div>
+    <div id="legendVelo">
+        <table>
+            <thead>
+            <tr>
+                <th>Legende</th>
+                <th>Type de parc</th>
+            </tr>
+            </thead>
+            <tbody id="legendVeloTable">
+            </tbody>
+        </table>
+    </div>
+    <div id="legendTramBus">
+        <table>
+            <thead>
+            <tr>
+                <th>Legende</th>
+                <th>Type d'arret</th>
+            </tr>
+            </thead>
+            <tbody id="legendTramBusStopTable">
+            </tbody>
+        </table>
+        <table>
+            <thead>
+            <tr>
+                <th>Legende</th>
+                <th>Ligne</th>
+            </tr>
+            </thead>
+            <tbody id="legendTramBusLigneTable">
+            </tbody>
+        </table>
+    </div>
+</div>
+<script type="text/javascript">
+            const IP = '192.168.0.16';
+            const PORT = '8600';
+            const URL = 'http://' + IP + ':' + PORT + '/geoserver/wms';
+
+            const WORKSPACE = 'SIGN';
+            const STATIONNEMENT_VELO = WORKSPACE + ':stationnementVelo';
+            const PISTES_CYCLABLES = WORKSPACE + ':pisteCyclable';
+            const ARRETS_TRAM_BUS = WORKSPACE + ':arretsTramBus';
+            const LIGNE_BUS = WORKSPACE + ':ligneBus';
+            const LIGNE_TRAM = WORKSPACE + ':ligneTram';
+
+            // ########################## Layers ##########################
+
+            const layer_tram = new ol.layer.Vector({
+                title: 'Lignes Tram',
+                source: new ol.source.Vector({
+                    url: URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_TRAM + "&outputFormat=application/json",
+                    format: new ol.format.GeoJSON(),
+                    serverType: 'geoserver',
+                }),
+            });
+
+            const layer_bus = new ol.layer.Vector({
+                title: 'Lignes Bus',
+                source: new ol.source.Vector({
+                    url: URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_BUS + "&outputFormat=application/json",
+                    format: new ol.format.GeoJSON(),
+                    serverType: 'geoserver',
+                }),
+            });
+
+            const layer_trambus_stop = new ol.layer.Vector({
+                title: 'Arrets Tram/Bus',
+                source: new ol.source.Vector({
+                    url: URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + ARRETS_TRAM_BUS + "&outputFormat=application/json",
+                    format: new ol.format.GeoJSON(),
+                    serverType: 'geoserver',
+                }),
+            });
+
+            const layer_velo = new ol.layer.Vector({
+                title: 'Stationnement Vélo',
+                source: new ol.source.Vector({
+                    url: URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + PISTES_CYCLABLES + "&outputFormat=application/json",
+                    format: new ol.format.GeoJSON(),
+                    serverType: 'geoserver',
+                }),
+            });
+
+            const layer_velo_stop = new ol.layer.Vector({
+                title: 'Stationnement Vélo',
+                source: new ol.source.Vector({
+                    url: URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + STATIONNEMENT_VELO + "&outputFormat=application/json",
+                    format: new ol.format.GeoJSON(),
+                    serverType: 'geoserver',
+                }),
+            });
+
+            // ########################## Style ##########################
+
+            const styles = {
+                tram: {
+                    "A": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#0000FF',
+                            width: 2
+                        })
+                    }),
+                    "B": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#00FF00',
+                            width: 2
+                        })
+                    })
+                },
+                bus: {
+                    "L01": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#34362D',
+                            width: 2
+                        })
+                    }),
+                    "L02": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#1B4400',
+                            width: 2
+                        })
+                    }),
+                    "L03": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#4FC601',
+                            width: 2
+                        })
+                    }),
+                    "L04": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#3B5DFF',
+                            width: 2
+                        })
+                    }),
+                    "L05": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#4A3B53',
+                            width: 2
+                        })
+                    }),
+                    "L06": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FF2F80',
+                            width: 2
+                        })
+                    }),
+                    "L07": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#61615A',
+                            width: 2
+                        })
+                    }),
+                    "L08": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#BA0900',
+                            width: 2
+                        })
+                    }),
+                    "L09": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#6B7900',
+                            width: 2
+                        })
+                    }),
+                    "L10": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#00C2A0',
+                            width: 2
+                        })
+                    }),
+                    "L11": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FFAA92',
+                            width: 2
+                        })
+                    }),
+                    "L12": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FF90C9',
+                            width: 2
+                        })
+                    }),
+                    "L13": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#B903AA',
+                            width: 2
+                        })
+                    }),
+                    "L15": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#D16100',
+                            width: 2
+                        })
+                    }),
+                    "L16": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#DDEFFF',
+                            width: 2
+                        })
+                    }),
+                    "L17": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#000035',
+                            width: 2
+                        })
+                    }),
+                    "L18": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#7B4F4B',
+                            width: 2
+                        })
+                    }),
+                    "L19": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#A1C299',
+                            width: 2
+                        })
+                    }),
+                    "L20": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#300018',
+                            width: 2
+                        })
+                    }),
+                    "L21": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#0AA6D8',
+                            width: 2
+                        })
+                    }),
+                    "L22": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#013349',
+                            width: 2
+                        })
+                    }),
+                    "L23": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#00846F',
+                            width: 2
+                        })
+                    }),
+                    "L25": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#372101',
+                            width: 2
+                        })
+                    }),
+                    "L26": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FFB500',
+                            width: 2
+                        })
+                    }),
+                    "L27": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#C2FFED',
+                            width: 2
+                        })
+                    }),
+                    "L28": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#A079BF',
+                            width: 2
+                        })
+                    }),
+                    "L33": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#CC0744',
+                            width: 2
+                        })
+                    }),
+                    "L34": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#C0B9B2',
+                            width: 2
+                        })
+                    }),
+                    "L35": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#C2FF99',
+                            width: 2
+                        })
+                    }),
+                    "L36": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#001E09',
+                            width: 2
+                        })
+                    }),
+                    "L37": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#00489C',
+                            width: 2
+                        })
+                    }),
+                    "L60": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#6F0062',
+                            width: 2
+                        })
+                    }),
+                    "L61": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#0CBD66',
+                            width: 2
+                        })
+                    }),
+                    "L62": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#EEC3FF',
+                            width: 2
+                        })
+                    }),
+                    "L63": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#456D75',
+                            width: 2
+                        })
+                    }),
+                    "L64": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#B77B68',
+                            width: 2
+                        })
+                    }),
+                    "L65": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#7A87A1',
+                            width: 2
+                        })
+                    }),
+                    "L70": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#788D66',
+                            width: 2
+                        })
+                    }),
+                    "L71": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#885578',
+                            width: 2
+                        })
+                    }),
+                    "L72": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FAD09F',
+                            width: 2
+                        })
+                    }),
+                    "L73": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#FF8A9A',
+                            width: 2
+                        })
+                    }),
+                    "LA": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#D157A0',
+                            width: 2
+                        })
+                    }),
+                    "LB": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#BEC459',
+                            width: 2
+                        })
+                    }),
+                    "LIC": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#456648',
+                            width: 2
+                        })
+                    }),
+                    "LL": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#0086ED',
+                            width: 2
+                        })
+                    }),
+                    "LO": new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: '#886F4C',
+                            width: 2
+                        })
+                    })
+                },
+                trambus_stop: {
+                    "BUS": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#B79762'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "TRAM": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#004D43'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "RESA": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#8FB0FF'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "TER BUS": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#997D87'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "REMI": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#809693'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                },
+                velo_stop: {
+                    "Arceaux": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#008941'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Abri": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#006FA6'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Parc Relais Vé": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#A30059'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Rateaux": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#FFDBE5'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Véloparc": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#7A4900'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Ouvrage": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#0000A6'
+                            }),
+                            radius: 3
+                        })
+                    }),
+                    "Porte Vélo": new ol.style.Style({
+                        image: new ol.style.Circle({
+                            fill: new ol.style.Fill({
+                                color: '#63FFAC'
+                            }),
+                            radius: 3
+                        })
+                    })
+                },
+                velo: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: '#FF0000',
+                        lineDash: [10, 10],
+                        width: 2
+                    })
+                })
+            }
+
+            layer_tram.getSource().on("featuresloadend", (e) => e.features.forEach(element => {
+                element.setStyle(styles.tram[element.get('num_ligne')]);
+            }));
+
+            layer_bus.getSource().on("featuresloadend", (e) => e.features.forEach(element => {
+                element.setStyle(styles.bus[element.get('num_ligne')]);
+            }));
+
+            layer_velo.getSource().on("featuresloadend", (e) => e.features.forEach(element => {
+                element.setStyle(styles.velo);
+            }));
+
+            layer_trambus_stop.getSource().on("featuresloadend", (e) => e.features.forEach(element => {
+                element.setStyle(styles.trambus_stop[element.get('categ_arret')]);
+            }));
+
+            layer_velo_stop.getSource().on("featuresloadend", (e) => e.features.forEach(element => {
+                element.setStyle(styles.velo_stop[element.get('type')]);
+            }));
+
+            // ########################## Map ##########################
+
+            const layers = [
+                new ol.layer.Tile({
+                    source: new ol.source.OSM(),
+                }),
+                layer_tram,
+                layer_bus,
+                layer_trambus_stop,
+                layer_velo,
+                layer_velo_stop,
+            ]
+
+            const view = new ol.View({
+                center: ol.proj.fromLonLat([1.909251, 47.902964]),
+                zoom: 13,
+            });
+
+            const map = new ol.Map({
+                layers: layers,
+                target: 'map',
+                view: view,
+            });
+
+
+            // ########################## Geolocalisation ##########################
+
+            const geolocation = new ol.Geolocation({
+                trackingOptions: {
+                    enableHighAccuracy: true,
+                },
+                projection: view.getProjection(),
+                tracking: true,
+            });
+
+            const accuracyFeature = new ol.Feature();
+            geolocation.on('change:accuracyGeometry', function () {
+                accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+            });
+
+            const positionFeature = new ol.Feature();
+            positionFeature.setStyle(
+                new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 6,
+                        fill: new ol.style.Fill({
+                            color: '#3399CC',
+                            width: 10,
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: '#fff',
+                            width: 5,
+                        }),
+                    }),
+                })
+            );
+
+            geolocation.on('change:position', function () {
+                const coordinates = geolocation.getPosition();
+                positionFeature.setGeometry(coordinates ? new ol.geom.Point(coordinates) : null);
+            });
+
+            new ol.layer.Vector({
+                map: map,
+                source: new ol.source.Vector({
+                    features: [accuracyFeature, positionFeature],
+                }),
+            });
+
+            // ########################## Filters ##########################
+
+            document.getElementById('velo').addEventListener('click', function () {
+                let visible = document.getElementById('velo').checked;
+                layer_velo.setVisible(visible);
+                layer_velo_stop.setVisible(visible);
+                $("#legendVelo").toggle(visible);
+            });
+
+            document.getElementById('tramBus').addEventListener('click', function () {
+                let visible = document.getElementById('tramBus').checked;
+                layer_tram.setVisible(visible);
+                layer_bus.setVisible(visible);
+                layer_trambus_stop.setVisible(visible);
+                $("#legendTramBus").toggle(visible);
+                $("#filter").toggle(visible);
+            });
+
+            document.getElementById('input_filter').addEventListener('keyup', function (event) {
+                if (event.key == "Enter") {
+                    let filter = document.getElementById('input_filter').value;
+                    if (filter !== '') {
+
+                        const elements = filter.split(',').map(e => e.trim());
+                        const formattedParams = "('" + elements.join("', '") + "')";
+
+                        // Add the filter to the source
+                        layer_tram.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_TRAM + "&outputFormat=application/json&CQL_FILTER=num_ligne IN " + formattedParams);
+                        layer_bus.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_BUS + "&outputFormat=application/json&CQL_FILTER=num_ligne IN " + formattedParams);
+                    } else {
+                        // Reset the source
+                        layer_tram.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_TRAM + "&outputFormat=application/json");
+                        layer_bus.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_BUS + "&outputFormat=application/json");
+                    }
+                    // Emmit the event to reload the features
+                    layer_bus.getSource().refresh();
+                    layer_tram.getSource().refresh();
+                }
+            });
+
+            document.getElementById('filter_btn').addEventListener('click', function () {
+                let filter = document.getElementById('input_filter').value;
+                if (filter !== '') {
+
+                    const elements = filter.split(',').map(e => e.trim());
+                    const formattedParams = "('" + elements.join("', '") + "')";
+
+                    // Add the filter to the source
+                    layer_tram.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_TRAM + "&outputFormat=application/json&CQL_FILTER=num_ligne IN " + formattedParams);
+                    layer_bus.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_BUS + "&outputFormat=application/json&CQL_FILTER=num_ligne IN " + formattedParams);
+                } else {
+                    // Reset the source
+                    layer_tram.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_TRAM + "&outputFormat=application/json");
+                    layer_bus.getSource().setUrl(URL + "?service=WFS&version=1.1.0&request=GetFeature&typeName=" + LIGNE_BUS + "&outputFormat=application/json");
+                }
+                // Emmit the event to reload the features
+                layer_bus.getSource().refresh();
+                layer_tram.getSource().refresh();
+            });
+
+            $(document).ready(function() {
+                // Dynamic creation of the legend (For bikes)
+                let veloBody = $("#legendVeloTable");
+                veloBody.append("<tr><td><div style=\"border-bottom: 5px dashed " + styles.velo.getStroke().getColor() + "; width: 50px;\"></div></td><td><p>Piste cyclables</p></td></tr>")
+                for (const [name, style] of Object.entries(styles.velo_stop)) {
+                    veloBody.append("<tr id=" + name + "><td><span class=\"dot\" style=\"background-color: " + style.getImage().getFill().getColor() + "\"></span></td><td><p>" + name + "</p></td></tr>")
+                }
+
+                // Dynamic creation of the legend (For Tram & buses)
+                let tramBusStopBody = $("#legendTramBusStopTable");
+                for (const [name, style] of Object.entries(styles.trambus_stop)) {
+                    tramBusStopBody.append("<tr id=" + name + "><td><span class=\"dot\" style=\"background-color: " + style.getImage().getFill().getColor() + "\"></span></td><td><p>" + name + "</p></td></tr>")
+                }
+                let tramBusLigneBody = $("#legendTramBusLigneTable");
+                for (const [name, style] of Object.entries(styles.tram)) {
+                    tramBusLigneBody.append("<tr id=" + name + "><td><div style=\"border-bottom: 5px solid " + style.getStroke().getColor() + "; width: 50px;\"></div></td><td><p>" + name + "</p></td></tr>")
+                }
+                for (const [name, style] of Object.entries(styles.bus)) {
+                    tramBusLigneBody.append("<tr id=" + name + "><td><div style=\"border-bottom: 5px solid " + style.getStroke().getColor() + "; width: 50px;\"></div></td><td><p>" + name + "</p></td></tr>")
+                }
+            });
+        </script>
+</body>
+</html>
